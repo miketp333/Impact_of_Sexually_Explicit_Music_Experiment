@@ -1,0 +1,124 @@
+---
+title: "W241 Final Project"
+subtitle: "The Effects of Sexually Explicit Music on Self Esteem"
+author: "Experiments and Causality"
+date: \today
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## Load Packages and Data
+
+```{r message=FALSE, warning=FALSE}
+library(XLConnect) # Used to connect to Excel
+library(stargazer)
+
+df <- readWorksheetFromFile("./Results/w241 Final Project_April 7, 2018_09.57.xlsx", sheet="LoadIntoR")
+
+nrow(df)
+```
+
+## Exploratory Analysis
+
+Create a dataframe with only the results from the treatment and control groups. Remove people who did not finish, or who were under 18 since these people were not given the study. Note: Highest possible esteem score (most esteem) = 10. Lowest possible esteem score (least esteem) = 70. The distributions of results are interesting. I suspect if we had more observations we would potentially see normal distributions centered around esteem score 23, but also with a large spike around the lowest score (highest esteem) of 10, which reflects a spike of people who have an overall high self esteem.
+
+```{r, fig.width=4, fig.height=3.5}
+results = df[df$TreatControl %in% c('Treatment','Control - Music','Control - No Music'), ]
+
+nrow(results)
+
+# Convert esteem score from character to numeric
+results$EsteemScore = as.numeric(results$EsteemScore)
+
+summary(results)
+
+hist(results$EsteemScore[results$TreatControl == 'Treatment'], breaks=20, 
+     main="Results: Treatment", xlab="Esteem Score", xlim=c(10,70))
+
+hist(results$EsteemScore[results$TreatControl == 'Control - Music'], breaks=20, 
+     main="Results: Control (Music)", xlab="Esteem Score", xlim=c(10,70))
+
+hist(results$EsteemScore[results$TreatControl == 'Control - No Music'], breaks=20, 
+     main="Results: Control (No Music)", xlab="Esteem Score", xlim=c(10,70))
+```
+
+## Models: Overall
+
+Both of the models below show that our treatment group had lower self esteem (higher score) than both control groups, but the results were not statistically significant. The score of the treatment group is 0.6 larger than the control group with music, and 2.1 larger than the control group with no music. 
+
+We included a control group with no music, so we could attempt to ensure that our control song did not have some type of effect. We did not see a statistically significant difference in the average esteem scores of each control group, and will therefore conclude that our treatment song did not have an effect.
+
+```{r}
+# Create new field that contains 1 for treatment and 0 for control groups
+results$treat[results$TreatControl == 'Treatment'] <- 1
+results$treat[results$TreatControl == 'Control - Music'] <- 0
+results$treat[results$TreatControl == 'Control - No Music'] <- 0
+
+# Model 1: Treatment vs. Control (Music)
+m1 <- lm(EsteemScore ~ treat, data=results[results$TreatControl %in% c('Treatment','Control - Music'), ])
+summary(m1)
+
+# Model 2: Treatment vs. Control (No Music)
+m2 <- lm(EsteemScore ~ treat, data=results[results$TreatControl %in% c('Treatment','Control - No Music'), ])
+summary(m2)
+
+# The difference in esteem score between both control groups is not statistically significant.
+t.test(results$EsteemScore[results$TreatControl=='Control - Music'], 
+       results$EsteemScore[results$TreatControl=='Control - No Music'])
+
+```
+
+## Models: Controls and Heterogeneous Treatment Effects
+
+The following analyses rely on the treatment group and control group with music. We feel that the control group with music is similar to a placebo because the subjects were subjected to the same conditions as the treatment group, except for the choice of song (the treatment). The control group without music did not have to listen to a song or take a lyrics comprehension quiz. We included this group to help ensure that our control song did not have an effect.
+
+# 1. Control for gender
+
+```{r}
+results$gen[results$Gender == 'Female'] <- 1
+results$gen[results$Gender == 'Male'] <- 0
+
+m3 <- lm(EsteemScore ~ treat + treat*gen, data=results[results$TreatControl %in% c('Treatment','Control - Music'), ])
+summary(m3)
+```
+
+# 2. Control for people who really like a song
+
+```{r}
+m4 <- lm(EsteemScore ~ treat + factor(LikeSong), data=results[results$TreatControl %in% c('Treatment','Control - Music'), ])
+summary(m4)
+```
+
+# 3. Control for different age groups
+
+```{r}
+m5 <- lm(EsteemScore ~ treat + factor(Age), data=results[results$TreatControl %in% c('Treatment','Control - Music'), ])
+summary(m5)
+```
+
+# 4. Control for gender and age groups
+
+```{r}
+m6 <- lm(EsteemScore ~ treat + treat*gen + factor(Age), data=results[results$TreatControl %in% c('Treatment','Control - Music'), ])
+summary(m6)
+```
+
+# 5. Control for gender and age groups, and if they liked the song
+
+```{r}
+m7 <- lm(EsteemScore ~ treat + treat*gen + factor(Age) + factor(LikeSong), data=results[results$TreatControl %in% c('Treatment','Control - Music'), ])
+summary(m7)
+```
+
+Results table. Removed model 2 because it relies on the control group with no music. Saves to html document in local directory
+
+```{r results = 'asis', message=FALSE, warning=FALSE}
+stargazer(m1, m3, m4, m5, m6, m7, title="Results: Treatment vs. Control (with Music)", no.space=TRUE, out="AllResults.htm")
+```
+
+## Analysis of Results
+
+We never found our treatment effect to be statistically significant. However, we did see that subjects in the treatment group had lower self esteem than the subjects in the control group. We also saw that our treatment was associated with lower self esteem in females compared to males. We hypothesized both of these outcomes. We also noticed that older subjects appeared to have higher self esteem compared to younger subjects. Even though the results were not significant, our study could be a worth continuing because we saw effects in the same direction that we hypothesized. Maybe with more data, or an altered experiment, we would see significant effects. 
+
+
